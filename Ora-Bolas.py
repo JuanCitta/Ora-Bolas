@@ -2,7 +2,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-
+import time
+# A velocidade inicial do robô é zero
+velocidade_atual_do_robô = 0
+# A aceleração do robô (ajuste conforme necessário)
+aceleracao_robô = 0.41208
+velocidade_maxima = 3
+# A posição final da bola (ponto fixo P2)
+x_meta, y_meta = 6.56914176, 5.992032
 print("Escolha o grafico que deve ser mostrado na telaz\n")
 print("1 para o grafico da posicao da bola em X e Y")
 print("2 para o grafico da velocidade da bola em X e Y")
@@ -10,6 +17,31 @@ print("3 para o grafico da aceleracao da bola em X e Y")
 print("4 para o grafico da trajetoria da bola")
 escolha = int(input("Digite a opcao desejada: "))
 
+# Função para calcular a distância entre dois pontos
+def calcular_distancia(x1, y1, x2, y2):
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+# Função para calcular a posição do robô com aceleração até atingir a velocidade máxima
+def calcular_posicao_robo(x_robô, y_robô, x_meta, y_meta, delta_t, velocidade, aceleracao, velocidade_maxima):
+    distancia_ate_meta = calcular_distancia(x_robô, y_robô, x_meta, y_meta)
+    nova_velocidade = velocidade + aceleracao * delta_t
+    nova_velocidade = min(nova_velocidade, velocidade_maxima)
+
+    # Distância percorrida com base na nova velocidade
+    distancia_percorrida = (velocidade + nova_velocidade) / 2 * delta_t
+
+    # Verificar se o robô chegou ou ultrapassou a meta
+    if distancia_percorrida >= distancia_ate_meta:
+        return x_meta, y_meta, nova_velocidade
+
+    # Calcular o percentual do caminho percorrido
+    percentual = distancia_percorrida / distancia_ate_meta
+
+    # Calcular as novas coordenadas do robô
+    x_novo = x_robô + percentual * (x_meta - x_robô)
+    y_novo = y_robô + percentual * (y_meta - y_robô)
+
+    return x_novo, y_novo, nova_velocidade
 
 if escolha == 1:
     Ball_posX = []
@@ -124,54 +156,85 @@ elif escolha == 4:
     df.plot(x='Trajetoria da bola em X', y='Trajetoria da bola em Y', ax=ax) 
     plt.show()
     
-elif escolha == 5:
-    X_Robo = []
-Y_Robo = []
-T = []
+elif escolha == 6:
+    x_robô = float(input("Digite a posicao X incial do robo: "))
+    y_robô = float(input("Digite a posicao Y incial do robo: "))
 
-def distancia(x1, y1, x2, y2):
-    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    #Declaracao de variaveis
+    L_X_Robo_RD = []
+    T_RD = []
+    L_Y_Robo_RD = []
+    x_meta, y_meta = 6.56914176, 5.992032
+# Lendo e processando as posições da bola
+    arquivo = open("trajetoria_da_bola.txt", "r")
 
-x_robo = 33
-y_robo = 9
-velocidade_robo = 2.8  # m/s
-aceleracao_robo = 2.8  # m/s^2
-raio_interceptacao = 0.09  # 9.43 em m 
+# Variáveis de controle de tempo
+    tempo_inicial = time.time()
+    ultimo_tempo_atualizacao = tempo_inicial
 
-# lendo o trajetoria da bola
-with open('trajetoria_da_bola.txt', 'r') as file:
-    linhas = file.read().splitlines()
+    # Loop de leitura das posições da bola
+    for linha in arquivo.readlines()[1:]:
+        colunas = linha.strip().replace(',', '.').split()
+        tempo_bola = float(colunas[0])
+        x_bola = float(colunas[1])
+        y_bola = float(colunas[2])
 
-for line in linhas[1:]:
-    t, x_ball, y_ball = map(lambda val: float(val.replace(',', '.')), line.split())
+        tempo_atual = time.time()
+        delta_t = tempo_atual - ultimo_tempo_atualizacao
+        ultimo_tempo_atualizacao = tempo_atual
 
-    distance_to_ball = distancia(x_robo, y_robo, x_ball, y_ball)
-    tempo_robo_dist = math.sqrt((2 * distance_to_ball) / aceleracao_robo)
-
-    # Calculando a nova posicao com a velocidade do robo
-    new_x_robo = x_robo + (t / tempo_robo_dist) * velocidade_robo
-    new_y_robo = y_robo + (t / tempo_robo_dist) * velocidade_robo
-
-    X_Robo.append(new_x_robo)
-    Y_Robo.append(new_y_robo)
-    T.append(t)
-
-# Creating the DataFrame for robot positions
-df = pd.DataFrame(data={'Tempo em segundos': T, 
-                        'Posicao do robo em X': X_Robo, })
-
-# Plotting the data
-fig, ax = plt.subplots(figsize=(20, 10)) 
-df.plot(x='Tempo em segundos', y='Posicao do robo em X', ax=ax) 
-plt.show()
-
-df = pd.DataFrame(data={'Tempo em segundos': T, 
-                        'Posicao do robo em Y': Y_Robo, })
-
-# Plotting the data
-fig, ax = plt.subplots(figsize=(20, 10)) 
-df.plot(x='Tempo em segundos', y='Posicao do robo em Y', ax=ax) 
-plt.show()
-
+        x_robô, y_robô, velocidade_atual_do_robô = calcular_posicao_robo(x_robô, y_robô, x_meta, y_meta, delta_t, velocidade_atual_do_robô, aceleracao_robô, velocidade_maxima)
+        L_X_Robo_RD.append(x_robô)
+        T_RD.append(delta_t)
+        L_Y_Robo_RD.append(y_robô)
+        if calcular_distancia(x_robô, y_robô, x_bola, y_bola) <= 0.2:
+            break
 
     
+        time.sleep(0.02)  # Dorme por 20ms
+    arquivo.close()
+     #Usando o Panda para desenhar o grafico de aceleracao da bola
+    df = pd.DataFrame(data={'Tempo em segundos': T_RD, 
+                        'Posicao do robo em Y': L_Y_Robo_RD, 
+                        'Posicao do robo em X': L_X_Robo_RD})
+
+
+    fig, ax = plt.subplots(figsize=(20,10)) 
+
+    df.plot(x = 'Tempo em segundos', y = 'Posicao do robo em Y', ax = ax) 
+    df.plot(x = 'Tempo em segundos', y = 'Posicao do robo em X', ax = ax, secondary_y = True) 
+    plt.show()
+
+elif escolha == 7:
+    L_X_Robo = []
+    T = []
+    L_Y_Robo = []
+
+# Lendo e processando as posições da bola
+    arquivo = open("ball_positions.txt", "r")
+
+# Variáveis de controle de tempo
+    tempo_inicial = time.time()
+    ultimo_tempo_atualizacao = tempo_inicial
+
+    # Loop de leitura das posições da bola
+    for linha in arquivo.readlines():
+        colunas = linha.strip().replace(',', '.').split()
+        tempo_bola = float(colunas[0])
+        x_bola = float(colunas[1])
+        y_bola = float(colunas[2])
+
+        tempo_atual = time.time()
+        delta_t = tempo_atual - ultimo_tempo_atualizacao
+        ultimo_tempo_atualizacao = tempo_atual
+
+        x_robô, y_robô, velocidade_atual_do_robô = calcular_posicao_robo(x_robô, y_robô, x_meta, y_meta, delta_t, velocidade_atual_do_robô, aceleracao_robô, velocidade_maxima)
+        L_X_Robo.append(x_robô)
+        T.append(delta_t)
+        L_Y_Robo.append(y_robô)
+        if calcular_distancia(x_robô, y_robô, x_bola, y_bola) <= 0.2:
+            break
+
+    
+        time.sleep(0.02)  # Dorme por 20ms
+    arquivo.close()
